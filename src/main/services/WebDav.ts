@@ -3,7 +3,14 @@ import { WebDavConfig } from '@types'
 import Logger from 'electron-log'
 import { HttpProxyAgent } from 'http-proxy-agent'
 import Stream from 'stream'
-import { BufferLike, createClient, GetFileContentsOptions, PutFileContentsOptions, WebDAVClient } from 'webdav'
+import {
+  BufferLike,
+  createClient,
+  GetFileContentsOptions,
+  PutFileContentsOptions,
+  WebDAVClient,
+  FileStat
+} from 'webdav'
 export default class WebDav {
   public instance: WebDAVClient | undefined
   private webdavPath: string
@@ -46,6 +53,34 @@ export default class WebDav {
     }
 
     const remoteFilePath = `${this.webdavPath}/${filename}`
+
+    if (await this.instance.exists(remoteFilePath)) {
+      const timestamp = new Date(new Date().getTime() + 8 * 60 * 60 * 1000)
+        .toISOString()
+        .replace(/[-:T.]/g, '')
+        .slice(0, 14)
+      const newRemoteFilePath = `${remoteFilePath}.${timestamp}`
+      await this.instance.moveFile(remoteFilePath, newRemoteFilePath)
+      Logger.info(`[WebDAV] Renamed existing file to ${newRemoteFilePath}`)
+    }
+
+    try {
+      const files = await this.instance.getDirectoryContents(this.webdavPath)
+      const backupFiles = (files as FileStat[])
+        .filter((file) => file.type === 'file' && file.basename.startsWith(filename))
+        .sort((a, b) => (a.lastmod && b.lastmod ? new Date(a.lastmod).getTime() - new Date(b.lastmod).getTime() : 0))
+
+      if (backupFiles.length > 10) {
+        const filesToDelete = backupFiles.slice(0, backupFiles.length - 10)
+        for (const file of filesToDelete) {
+          await this.instance.deleteFile(file.filename)
+          Logger.info(`[WebDAV] Deleted old backup file: ${file.filename}`)
+        }
+      }
+    } catch (error) {
+      Logger.error('[WebDAV] Error managing backup files on WebDAV:', error)
+      throw error
+    }
 
     try {
       return await this.instance.putFileContents(remoteFilePath, data, options)

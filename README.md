@@ -1,3 +1,14 @@
+# CHANGELOG
+
+```sh
+corepack enable && corepack prepare yarn@4.6.0 --activate
+corepack yarn install
+corepack yarn build:win
+```
+
+1. WebDav.ts 保留webdav历史备份, 限制最大备份数量10个
+
+
 <h1 align="center">
   <a href="https://github.com/kangfenmao/cherry-studio/releases">
     <img src="https://github.com/kangfenmao/cherry-studio/blob/main/build/icon.png?raw=true" width="150" height="150" alt="banner" /><br>
